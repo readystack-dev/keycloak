@@ -1,0 +1,4 @@
+eclipse-temurin:21-jre-noble@sha256:ac595159aa2209f07a2331efa8a8ce4278b77a7b76a9365a0f173786d5067a9e	bases/eclipse-temurin_21-jre-noble_ac595159aa22.oci
+golang:1.27.3-bookworm@sha256:972b4110ba0f47539a975c31e52c64765e1ff19f2d74469ae4a595c6676e80a5	bases/golang_1.27.3-bookworm_972b4110ba0f.oci
+maven:3.9.8-eclipse-temurin-21@sha256:de18e4e51396ad9266f76669779ed6d6b49fbb0f45ed6f39169d87378d548d7d	bases/maven_3.9.8-eclipse-temurin-21_de18e4e51396.oci
+ubuntu:24.04@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289	bases/ubuntu_24.04_9c7f200c07e3.oci

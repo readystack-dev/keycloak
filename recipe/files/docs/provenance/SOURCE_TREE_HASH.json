@@ -1,0 +1,9 @@
+{
+  "schema": "kitforge.source_tree_hash.v1",
+  "slug": "keycloak",
+  "repo": "https://github.com/keycloak/keycloak",
+  "ref": "26.8.2",
+  "commit": "e514445f9dcdabc5bdcf67cab56c1e49655de067",
+  "tree_listing_sha256": "5dd18d89b866300380e8063e8d776b341a341f81c6b9ca3e3f30ce4313139a78",
+  "file_count": 13524
+}

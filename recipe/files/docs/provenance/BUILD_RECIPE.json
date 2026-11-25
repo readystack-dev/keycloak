@@ -1,0 +1,165 @@
+{
+  "schema": "kitforge.build_recipe.v1",
+  "slug": "keycloak",
+  "image": "readystack/keycloak:26.8.2-CE-ubuntu24.04-r5",
+  "build_method": "source-rebuild-java",
+  "source": {
+    "repo": "https://github.com/keycloak/keycloak",
+    "ref": "26.8.2",
+    "builder_image": "maven:3.9.8-eclipse-temurin-21",
+    "jdk_version": "21",
+    "maven_version": "3.9.8",
+    "build_packages": [
+      "git",
+      "ca-certificates",
+      "libicu-dev"
+    ],
+    "build_env": {
+      "MAVEN_OPTS": "-Xmx4g",
+      "JAVA_HOME": "/opt/java/openjdk"
+    },
+    "build": {
+      "tool": "maven-wrapper",
+      "_note": "Real from-source compile, ONLINE in the vendor stage. ./mvnw downloads Maven 3.9.8 (.mvn/wrapper) + the full reactor's deps. Targeted server build per docs/building.md ('To build only the server'): -pl quarkus/deployment,quarkus/dist -am builds the whole upstream reactor needed by the server distribution. -DskipProtoLock=true is REQUIRED with --depth-1 (no git history for the proto-compat plugin). The product of this stage is the unpacked distribution at /opt/keycloak, which is what the offline stage assembles.",
+      "reactor_build_cmd": "./mvnw -B -e -DskipTests -DskipProtoLock=true -pl quarkus/deployment,quarkus/dist -am clean install",
+      "dist_artifact": "quarkus/dist/target/keycloak-26.8.2.tar.gz",
+      "unpack_cmd": "mkdir -p /opt/keycloak && tar -xzf quarkus/dist/target/keycloak-26.8.2.tar.gz -C /opt/keycloak --strip-components=1 && rm -rf .git",
+      "dist_export": "/opt/keycloak"
+    },
+    "offline_augment": {
+      "_note": "NOT READ BY ANY GENERATOR (kept as the canonical statement of the build options); the command runs from runtime_scaffold.post_copy_run. Quarkus build-time augmentation, runs in the --network=none offline stage as root BEFORE the USER switch. NO network, NO DB connection -- it only pre-computes the optimized Quarkus app under /opt/keycloak/lib/quarkus and bakes the --db/--health/--metrics build options so the runtime can `start --optimized`. The postgres JDBC driver is already bundled in the from-source distribution. Must run AFTER the COPY of vendored /opt/keycloak and BEFORE chown to the non-root user.",
+      "cmd": "/opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true --metrics-enabled=true"
+    },
+    "vendored_export_note": "Renderer exports vendored/keycloak-dist (the from-source-built, unpacked /opt/keycloak) + vendored/debs (the eclipse-temurin:21-jre-noble dist-upgrade deb closure incl. curl/tzdata/ca-certificates). The offline Dockerfile: FROM <jre base pin>; dpkg-install debs; COPY vendored/keycloak-dist /opt/keycloak; RUN kc.sh build ...; useradd keycloak; chown -R keycloak /opt/keycloak; USER keycloak; ENTRYPOINT. STRICTER ALTERNATIVE (Go-analogous, higher-risk, only if a true offline RECOMPILE is required): vendor stage also exports a populated -Dmaven.repo.local=.m2 and the offline stage re-runs `./mvnw -o ... install`; Maven -o plugin resolution is fragile, so Design A (compile-online/assemble-offline, the Node model) is the primary path.",
+    "dep_bumps_note": "Java CVE remediation is NOT go-get-style. Keycloak BOM-pins everything; the proven levers are (a) the java-maven-overlay jar-swap (lang-patches/maven/<groupId>/<artifactId>/<artifactId>-<fixedver>.jar overlaid onto /opt/keycloak/lib, L-047 anchored match) for a vulnerable bundled jar, and (b) a freshest eclipse-temurin:21-jre digest + debvendor dist-upgrade for base/JRE/OS CVEs. Populate from the first Scout verdict.",
+    "build_tool": "maven",
+    "vendor_dirs": [
+      "/m2",
+      "/pnpm-store",
+      "/pnpm-cache"
+    ],
+    "online_vendor_cmds": [
+      "cd /src && KC_BUILD_TIME=\"$(printf '%s\\n' $MAVEN_ARGS | sed -n 's/^-Dproject\\.build\\.outputTimestamp=\\([0-9]\\{4\\}-[0-9][0-9]-[0-9][0-9]\\)T\\([0-9][0-9]:[0-9][0-9]\\):[0-9][0-9]Z$/\\1 \\2/p')\" && test -n \"$KC_BUILD_TIME\" && echo \"keycloak-version.properties build-time=$KC_BUILD_TIME\" && npm_config_store_dir=/pnpm-store npm_config_cache=/pnpm-cache MAVEN_OPTS=-Xmx3g mvn \"-Dtimestamp=$KC_BUILD_TIME\" -B -pl quarkus/deployment,quarkus/dist -am -DskipTests -DskipProtoLock=true -Dmaven.build.cache.enabled=false -Dmaven.repo.local=/m2 clean install"
+    ],
+    "offline_build_cmds": [
+      "cd /src && KC_BUILD_TIME=\"$(printf '%s\\n' $MAVEN_ARGS | sed -n 's/^-Dproject\\.build\\.outputTimestamp=\\([0-9]\\{4\\}-[0-9][0-9]-[0-9][0-9]\\)T\\([0-9][0-9]:[0-9][0-9]\\):[0-9][0-9]Z$/\\1 \\2/p')\" && test -n \"$KC_BUILD_TIME\" && echo \"keycloak-version.properties build-time=$KC_BUILD_TIME\" && npm_config_store_dir=/pnpm-store npm_config_cache=/pnpm-cache MAVEN_OPTS=-Xmx3g mvn \"-Dtimestamp=$KC_BUILD_TIME\" -o -B -pl quarkus/deployment,quarkus/dist -am -DskipTests -DskipProtoLock=true -Dmaven.build.cache.enabled=false -Dmaven.repo.local=/m2 clean install",
+      "tar -xzf quarkus/dist/target/keycloak-*.tar.gz -C /opt --strip-components=0 && mv /opt/keycloak-* /opt/keycloak && mkdir -p /opt/keycloak/data",
+      "mkdir -p /tmp/rs-canon && printf '%s\\n' 'import java.io.*;' 'import java.nio.file.*;' '' '// Re-serializes the Quarkus lib/deployment/appmodel.dat with every String interned, so a value that occurs twice is' '// always written as one TC_STRING plus back-references. ObjectOutputStream otherwise shares a String only when the' '// in-memory model happened to hold the same instance, which varies from build to build.' 'public class AppModelCanon {' '    public static void main(String[] args) throws Exception {' '        Path in = Path.of(args[0]), out = Path.of(args.length > 1 ? args[1] : args[0]);' '        byte[] original = Files.readAllBytes(in);' '        Object model;' '        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(original))) {' '            model = ois.readObject();' '            if (ois.read() != -1) throw new IllegalStateException(\"trailing data after the model in \" + in);' '        }' '        ByteArrayOutputStream bytes = new ByteArrayOutputStream();' '        try (ObjectOutputStream oos = new ObjectOutputStream(bytes) {' '            { enableReplaceObject(true); }' '            @Override protected Object replaceObject(Object o) { return o instanceof String s ? s.intern() : o; }' '        }) {' '            oos.writeObject(model);' '        }' '        Files.write(out, bytes.toByteArray());' '        System.out.println(\"canonicalized \" + in + \" -> \" + out + \" (\" + original.length + \" -> \" + bytes.size() + \" bytes)\");' '    }' '}' > /tmp/rs-canon/AppModelCanon.java && java -cp '/opt/keycloak/lib/lib/deployment/*:/opt/keycloak/lib/lib/boot/*:/opt/keycloak/lib/lib/main/*' /tmp/rs-canon/AppModelCanon.java /opt/keycloak/lib/lib/deployment/appmodel.dat && rm -rf /tmp/rs-canon"
+    ],
+    "offline_env": {
+      "MAVEN_OPTS": "-Xmx3g",
+      "npm_config_store_dir": "/pnpm-store",
+      "npm_config_cache": "/pnpm-cache"
+    },
+    "install": {
+      "output_glob": "quarkus/dist/target/keycloak-26.8.2.tar.gz",
+      "extract_to": "/opt/keycloak"
+    },
+    "_java_recipe_note": "PROVEN offline-vendoring recipe (wf_6853482e, empirical on <redacted: internal host>, confidence high \u2014 The reactor c). render_l009_java_kit consumes build_tool/vendor_dirs/online_vendor_cmds/offline_build_cmds/offline_env/install. GOTCHAS: Use the builder image's system `mvn` (it IS Apache Maven 3.9.8, matching the repo's pinned version) \u2014 NOT `./mvnw`. The wrapper self-downloads apache-maven-3.9.8-bin.zip from repo.maven.apache.org at startup (per .mvn/wrapper/maven-wrapper.properties), which fails under --network=none. Alternatively vendor /root/.m2/wrapper. | -DskipProtoLock=true is MANDATORY. proto-schema-compatibility-maven-plugin is bound with <skip>${skipProtoLock}</skip> (default false) and needs full git history; on a --depth 1 shallow clone and offline it fails. (BUILDING.md explicitly warns it breaks in proxy/offline environments.) | TWO remote repos are used: Maven Central AND jboss-public-repository (https://repository.jboss.org/nexus/content/groups/public/) \u2014 observed live during the probe. A full online `install` caches both into /m2. Do not hand-roll a settings.xml that omits jboss; many wildfly/jboss/quarkus artifacts resolve only there. | `mvn dependency:go-offline` is NOT sufficient: it misses maven-assembly-plugin descriptor deps, the maven-build-cache-extension, some plugin transitives, and it never runs the frontend so the pnpm store stays empty. You MUST run a real `-pl quarkus/deployment,quarkus/dist -am install` online to fully warm /m2 + the pnpm store.",
+    "source_date_epoch": 1795333788,
+    "source_date_epoch_provenance": "the time release 26.8.2-CE-ubuntu24.04-r5 was cut (2026-11-22T07:49:48Z), by scripts/retarget.py --rev-bump: ReadyStack dates an image by when its release was packaged (owner 2026-11-10), recorded here once and used by every rebuild of the release; it builds upstream commit e514445f9dcd, dated 2026-11-05T15:27:24Z (source.commit_epoch).",
+    "_build_packages_note": "libicu-dev (2026-09-20, chain 412): the keycloak-js module's `pnpm build` runs @kiota-community/kiota-gen, which executes a self-contained .NET binary to generate the admin-client TypeScript from openapi.json. .NET FailFasts at startup without ICU (\"Couldn't find a valid ICU package installed\") and core-dumps, failing the whole Maven reactor at keycloak-js-parent. maven:3.9.8-eclipse-temurin-21 carries no libicu. build_packages feeds BOTH the online jvendor stage AND the builddebvendor deb closure that the --network=none offline stage installs, so the replay gets it too. libicu-dev rather than a versioned libicuNN so this survives a builder base bump.",
+    "source_prep": [
+      "mkdir -p /pnpm-store /pnpm-cache && printf 'store-dir=/pnpm-store\\ncache-dir=/pnpm-cache\\n' > /root/.npmrc && cat /root/.npmrc",
+      "printf '%s\\n' '--- a/quarkus/deployment/src/main/java/org/keycloak/quarkus/deployment/KeycloakProcessor.java' '+++ b/quarkus/deployment/src/main/java/org/keycloak/quarkus/deployment/KeycloakProcessor.java' '@@ -25,9 +25,11 @@' ' import java.nio.charset.StandardCharsets;' ' import java.util.ArrayList;' ' import java.util.Collections;' '+import java.util.Comparator;' ' import java.util.Enumeration;' ' import java.util.HashMap;' ' import java.util.HashSet;' '+import java.util.LinkedHashMap;' ' import java.util.LinkedHashSet;' ' import java.util.List;' ' import java.util.Map;' '@@ -41,6 +43,7 @@' ' import java.util.jar.JarEntry;' ' import java.util.jar.JarFile;' ' import java.util.logging.Handler;' '+import java.util.stream.Collectors;' ' ' ' import jakarta.inject.Singleton;' ' import jakarta.persistence.PersistenceUnitTransactionType;' '@@ -708,7 +711,9 @@' '     @Record(ExecutionTime.STATIC_INIT)' '     @BuildStep' '     void prepareKeycloakLogFilter(KeycloakRecorder recorder) {' '-        recorder.setHibernateUnsupportedProperties(collectAllDefaultUnsupportedHibernateProperties());' '+        // Sorted: the source set is Collectors.toUnmodifiableSet(), whose iteration order is salted per JVM run.' '+        recorder.setHibernateUnsupportedProperties(collectAllDefaultUnsupportedHibernateProperties().stream().sorted()' '+                .collect(Collectors.toCollection(LinkedHashSet::new)));' '     }' ' ' '     @BuildStep' '@@ -833,10 +838,31 @@' ' ' '         return SyntheticBeanBuildItem.configure(QuarkusKeycloakSessionFactory.class).scope(Singleton.class)' '                 .unremovable()' '-                .runtimeValue(recorder.createSessionFactory(factories, defaultProviders, preConfiguredProviders,' '+                .runtimeValue(recorder.createSessionFactory(stableFactories(factories),' '+                        stableOrder(defaultProviders, Class::getName), stableOrder(preConfiguredProviders, id -> id),' '                         loadThemesFromClassPath())).done();' '     }' ' ' '+    // The recorder replays each map in iteration order. These maps are HashMaps keyed by Spi instances and Class' '+    // objects, which hash by identity, so their order (and the generated bytecode) changed from one JVM run to the next.' '+    private static Map<Spi, Map<Class<? extends Provider>, Map<String, Class<? extends ProviderFactory>>>> stableFactories(' '+            Map<Spi, Map<Class<? extends Provider>, Map<String, Class<? extends ProviderFactory>>>> factories) {' '+        Map<Spi, Map<Class<? extends Provider>, Map<String, Class<? extends ProviderFactory>>>> result = new LinkedHashMap<>();' '+        stableOrder(factories, spi -> spi.getName() + \"/\" + spi.getClass().getName()).forEach((spi, byProvider) -> {' '+            Map<Class<? extends Provider>, Map<String, Class<? extends ProviderFactory>>> providers = new LinkedHashMap<>();' '+            stableOrder(byProvider, Class::getName).forEach((provider, byId) -> providers.put(provider, stableOrder(byId, id -> id)));' '+            result.put(spi, providers);' '+        });' '+        return result;' '+    }' '+' '+    private static <K, V> Map<K, V> stableOrder(Map<K, V> map, Function<K, String> sortKey) {' '+        Map<K, V> result = new LinkedHashMap<>();' '+        map.entrySet().stream().sorted(Comparator.comparing(e -> sortKey.apply(e.getKey())))' '+                .forEachOrdered(e -> result.put(e.getKey(), e.getValue()));' '+        return result;' '+    }' '+' '     private List<ClasspathThemeProviderFactory.ThemesRepresentation> loadThemesFromClassPath() {' '         try {' '             List<ClasspathThemeProviderFactory.ThemesRepresentation> themes = new ArrayList<>();' > /tmp/rs-kc-determinism.patch && git apply --verbose /tmp/rs-kc-determinism.patch && rm -f /tmp/rs-kc-determinism.patch && grep -qF 'recorder.createSessionFactory(stableFactories(factories),' quarkus/deployment/src/main/java/org/keycloak/quarkus/deployment/KeycloakProcessor.java && grep -qF 'collectAllDefaultUnsupportedHibernateProperties().stream().sorted()' quarkus/deployment/src/main/java/org/keycloak/quarkus/deployment/KeycloakProcessor.java && echo 'KeycloakProcessor: recorder inputs in a stable order'"
+    ],
+    "_source_prep_note": "Pins pnpm's store to the paths vendor_dirs exports. MEASURED 2026-09-20 (chain 412): the online_vendor_cmds set npm_config_store_dir=/pnpm-store and npm_config_cache=/pnpm-cache, and pnpm v11 IGNORED BOTH \u2014 a probe of the built jvendor stage found no /pnpm-store and no /pnpm-cache, with the real store at /root/.local/share/pnpm/store (pnpm's XDG default) and no /root/.cache at all. pnpm no longer honours the npm_config_* env convention for these settings. The Maven reactor therefore SUCCEEDED and the build still died in the export stage on `COPY --from=jvendor /pnpm-store: not found`. A user-level /root/.npmrc is the authoritative config pnpm does read, and it applies wherever the frontend-maven-plugin launches pnpm from, unlike a project .npmrc under /src/js. mkdir -p also guarantees the COPY has something to copy, so a future pnpm change degrades to an empty cache rather than a failed build. The env vars stay in online_vendor_cmds as belt-and-braces; the .npmrc is what actually works.",
+    "maven_dependency_overrides": [
+      {
+        "group": "com.google.guava",
+        "artifacts": [
+          "guava"
+        ],
+        "version": "33.7.2-jre",
+        "exclusions": [
+          {
+            "group": "com.google.code.findbugs",
+            "artifact": "jsr305"
+          },
+          {
+            "group": "com.google.guava",
+            "artifact": "listenablefuture"
+          }
+        ],
+        "guard": "<quarkus.version>3.40.1.1</quarkus.version>",
+        "why": "CVE-2026-102554 / GHSA-xxph-c9ww-hj94 (high, published 2026-10-27; fixed in 33.7.2-jre). quarkus-bom 3.40.1 manages guava at 33.6.0-jre (with these two exclusions, restated here because an override replaces the BOM's entry whole); held chain 684's G8 refused the publish on it (fixable_crit_high=1). Was a perl source_prep command (04b20374), now this engine key. Re-decided 2026-11-06 for keycloak 26.8.2 (quarkus-bom 3.40.1.1, read from Maven Central): it still manages guava at 33.6.0-jre with the same two exclusions, so the override stays; guard moved to 3.40.1.1."
+      }
+    ],
+    "_maven_dependency_overrides_note": "The overrides are declared in the root pom's dependencyManagement by the generator (source.maven_dependency_overrides, gen_dockerfile maven_override_vendor_lines) before the online build, so /m2 holds the fixed versions and the offline replay resolves the same; a dependency declared there wins over the imported quarkus-bom. They are source pins, not the java-maven-overlay jar swap in dep_bumps_note, because the Quarkus augmentation (kc.sh build) records every dependency's coordinates in lib/deployment/appmodel.dat: Maven must resolve the fixed version for the model to name the jar that ships. The guard fails the vendor build once the root pom no longer names quarkus 3.40.1.1 (a retarget): a newer quarkus-bom may manage newer versions, and an override must never pin one back, so each is re-decided then (remove it once quarkus-bom manages >= the version here). The offline stage fails closed if the distribution holds a jar of a named artifact at another version. 2026-11-06 (26.8.2): the brotli4j override is retired (upstream no longer ships brotli4j; see _maven_dependency_overrides_retired); guava's stays.",
+    "_reproducibility_note": "Bit-for-bit (chain 497 diagnosis 2026-10-06, diffoci + 3-5 repeated local kc.sh build runs): four run-to-run residuals, each fixed here. (1) keycloak-version.properties build-time=${timestamp} <- maven.build.timestamp (wall clock): both Maven commands pass -Dtimestamp derived from the -Dproject.build.outputTimestamp the generator renders from SOURCE_DATE_EPOCH (MAVEN_ARGS), fail-closed if absent; the old hard-coded -Dproject.build.outputTimestamp=2026-09-16T14:08:36Z override is gone, so build-system.properties now carries the 26.8.0 commit date. (2) KeycloakProcessor recorded HashMaps keyed by Spi/Class (identity hash) and a Collectors.toUnmodifiableSet() log-filter set (JVM-salted order): source_prep applies kc-determinism.patch (sorted LinkedHashMap/LinkedHashSet copies) with git apply + grep -qF guard. (3) lib/deployment/appmodel.dat: ObjectOutputStream string back-references depend on resolver object identity: offline_build_cmds re-serializes it with every String interned (AppModelCanon), canonical regardless of which instances were kept. (4) keycloak-persisted.properties '#<date>' header: post_copy_run sets -Djava.properties.date from SOURCE_DATE_EPOCH. Validated locally: unpatched control 3/3 runs differ; patched 5/5 identical; the patched image boots (health/ready, OIDC discovery, JWKS, admin-cli token). Not yet proven end to end: the full offline reactor + full-image digest compare (the next drive).",
+    "commit": "e514445f9dcdabc5bdcf67cab56c1e49655de067",
+    "_maven_dependency_overrides_retired": [
+      {
+        "group": "com.aayushatharva.brotli4j",
+        "artifacts": [
+          "brotli4j",
+          "service",
+          "native-linux-x86_64",
+          "native-linux-aarch64",
+          "native-linux-armv7",
+          "native-linux-ppc64le",
+          "native-linux-riscv64",
+          "native-linux-s390x",
+          "native-osx-x86_64",
+          "native-osx-aarch64",
+          "native-windows-x86_64",
+          "native-windows-aarch64"
+        ],
+        "version": "1.24.0",
+        "guard": "<quarkus.version>3.40.1.1</quarkus.version>",
+        "why": "CVE-2026-111497 (CISA KEV since 2026-10-27, Google Brotli decoder; fixed in google/brotli v1.2.1). quarkus-bom 3.40.1 manages every brotli4j artifact at 1.23.0, whose native-linux-x86_64 jar bundles libbrotli.so built from Brotli 1.2.0 (BrotliDecoderVersion returns 0x1002000); brotli4j 1.24.0 (2026-10-24, PR #273 'Upgrade brotli dependency to 1.2.1') bundles 1.2.1 (0x1002001), both read from the Maven Central jars on 2026-10-29. Scout, grype and OSV match only the Ubuntu libbrotli1 package, so the bundled copy is fixed here, not left to a scanner. service is not in the BOM: listed so brotli4j's own service dependency resolves at 1.24.0 too. Re-decided 2026-11-06 for keycloak 26.8.2 (quarkus-bom 3.40.1.1, read from Maven Central): it still manages every brotli4j artifact at 1.23.0 (the same eleven artifacts), so the override stays; guard moved to 3.40.1.1.",
+        "_pin_reason": {
+          "verified": "Written into the project's own dependencyManagement before the online build, so it wins over the imported BOM; the vendor build fails if the pom no longer carries the guard the override was decided against, and the offline stage fails if any shipped brotli4j jar is at another version. Maven downloads it from Maven Central with no checksum pinned in advance.",
+          "decided": "2026-10-29, ReadyStack change b537b928 (\"keycloak, frappecrm: CVE-2026-111497 (CISA KEV) replacements\")",
+          "value": "1.24.0",
+          "checked": "2026-11-06: quarkus-bom 3.40.1.1 (keycloak 26.8.2's root pom) manages brotli4j 1.23.0, below this pin; guard moved to 3.40.1.1"
+        },
+        "retired": "2026-11-06, keycloak 26.8.2 (chain 822)",
+        "why_retired": "keycloak 26.8.2 ships no brotli4j jar: upstream's 'Exclude brotli4j from all quarkus-vertx-http paths and remove stale exclusions (#1539)' (in GitHub compare 26.8.1...26.8.2) drops it, and upstream's quay.io/keycloak/keycloak:26.8.2 has none in lib/lib/main. With nothing shipped, the offline check refused the override (chain 822 scratch build, watch_queue 10369: 'maven_dependency_overrides[1]: no jar of it in the distribution'). CVE-2026-111497 lived in brotli4j's bundled native decoder, so it no longer applies to the Java side; the system libbrotli1 is the base image's and is scanned as before."
+      }
+    ],
+    "source_date_epoch_basis": "release-cut",
+    "commit_epoch": 1793892444
+  },
+  "binaries_from_source": null,
+  "runtime_packages": [
+    "base-files",
+    "base-passwd",
+    "ca-certificates",
+    "coreutils",
+    "dash",
+    "findutils",
+    "grep",
+    "libacl1",
+    "libc-bin",
+    "libc6",
+    "libpcre2-8-0",
+    "libselinux1",
+    "libssl3t64",
+    "openssl",
+    "sed",
+    "tzdata"
+  ],
+  "runtime_base": {
+    "kind": "chisel",
+    "shell": true,
+    "tools": [
+      "sed",
+      "grep"
+    ],
+    "slices": [
+      "libc-bin_locale",
+      "findutils_bins"
+    ],
+    "provides": [
+      "/opt/keycloak/bin/kc.sh",
+      "kc.sh",
+      "xargs",
+      "find"
+    ],
+    "jre_run": [
+      "PROPS_DATE=\"$(date -u -d \"@${SOURCE_DATE_EPOCH:?}\" +%Y-%m-%dT%H:%M:%SZ)\" && JAVA_OPTS_APPEND=\"-Djava.properties.date=$PROPS_DATE\" /opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true --metrics-enabled=true"
+    ],
+    "packages": "vendored/chisel/packages.tsv"
+  }
+}

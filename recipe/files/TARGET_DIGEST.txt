@@ -1,0 +1,8 @@
+image_manifest_digest=sha256:d26a943af80397d2aa6986f505cef74c2a5475a3d01511ac2219ff0be9719190
+config_digest=sha256:64220669c2f942dbe13c299d9a10ead626d05a70a3b9289689faaf0c9e14df8b
+tag=readystack/keycloak:26.8.2-CE-ubuntu24.04-r5
+probe_port=9000
+probe_path=/health/ready
+probe_timeout=180
+verify_boot=skip
+verify_boot_reason=this image needs pg (not part of this archive); boot it with your own services as the admin handbook describes

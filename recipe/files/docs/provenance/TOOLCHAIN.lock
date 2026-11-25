@@ -1,0 +1,146 @@
+{
+  "apt_refresh": [
+    {
+      "min_version": "10.42-4ubuntu2.2",
+      "package": "libpcre2-8-0",
+      "reason": "UBUNTU-CVE-2026-103111, UBUNTU-CVE-2026-86145, UBUNTU-CVE-2026-89157, UBUNTU-CVE-2026-89161: libpcre2-8-0 10.42-4ubuntu2.1 -> 10.42-4ubuntu2.2"
+    },
+    {
+      "min_version": "2.39-0ubuntu8.12",
+      "package": "libc-bin",
+      "reason": "CVE-2026-18374, CVE-2026-84243, CVE-2026-8674, CVE-2026-86805 \u2026: libc-bin 2.39-0ubuntu8.9 -> 2.39-0ubuntu8.12"
+    },
+    {
+      "min_version": "2.39-0ubuntu8.12",
+      "package": "libc6",
+      "reason": "CVE-2026-18374, CVE-2026-84243, CVE-2026-8674, CVE-2026-86805 \u2026: libc6 2.39-0ubuntu8.9 -> 2.39-0ubuntu8.12"
+    }
+  ],
+  "build_method": "source-rebuild-java",
+  "chain_id": 1192,
+  "dep_bumps": [],
+  "expected_residuals": [],
+  "images": [
+    {
+      "digest": "sha256:de18e4e51396ad9266f76669779ed6d6b49fbb0f45ed6f39169d87378d548d7d",
+      "ref": "maven:3.9.8-eclipse-temurin-21",
+      "role": "builder"
+    },
+    {
+      "digest": "sha256:ac595159aa2209f07a2331efa8a8ce4278b77a7b76a9365a0f173786d5067a9e",
+      "ref": "eclipse-temurin:21-jre-noble",
+      "role": "offline_builder"
+    },
+    {
+      "digest": "sha256:ac595159aa2209f07a2331efa8a8ce4278b77a7b76a9365a0f173786d5067a9e",
+      "ref": "eclipse-temurin:21-jre-noble",
+      "role": "base"
+    }
+  ],
+  "mod_replaces": [],
+  "runtime_base": {
+    "jre_run": [
+      "PROPS_DATE=\"$(date -u -d \"@${SOURCE_DATE_EPOCH:?}\" +%Y-%m-%dT%H:%M:%SZ)\" && JAVA_OPTS_APPEND=\"-Djava.properties.date=$PROPS_DATE\" /opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true --metrics-enabled=true"
+    ],
+    "kind": "chisel",
+    "provides": [
+      "/opt/keycloak/bin/kc.sh",
+      "kc.sh",
+      "xargs",
+      "find"
+    ],
+    "shell": true,
+    "slices": [
+      "libc-bin_locale",
+      "findutils_bins"
+    ],
+    "tools": [
+      "sed",
+      "grep"
+    ]
+  },
+  "schema": "kitforge.toolchain_lock.v1",
+  "slug": "keycloak",
+  "source": {
+    "build": {
+      "dist_artifact": "quarkus/dist/target/keycloak-26.8.2.tar.gz",
+      "dist_export": "/opt/keycloak",
+      "reactor_build_cmd": "./mvnw -B -e -DskipTests -DskipProtoLock=true -pl quarkus/deployment,quarkus/dist -am clean install",
+      "tool": "maven-wrapper",
+      "unpack_cmd": "mkdir -p /opt/keycloak && tar -xzf quarkus/dist/target/keycloak-26.8.2.tar.gz -C /opt/keycloak --strip-components=1 && rm -rf .git"
+    },
+    "build_env": {
+      "JAVA_HOME": "/opt/java/openjdk",
+      "MAVEN_OPTS": "-Xmx4g"
+    },
+    "build_packages": [
+      "git",
+      "ca-certificates",
+      "libicu-dev"
+    ],
+    "build_tool": "maven",
+    "builder_image": "maven:3.9.8-eclipse-temurin-21",
+    "commit": "e514445f9dcdabc5bdcf67cab56c1e49655de067",
+    "commit_epoch": 1793892444,
+    "dep_bumps_note": "Java CVE remediation is NOT go-get-style. Keycloak BOM-pins everything; the proven levers are (a) the java-maven-overlay jar-swap (lang-patches/maven/<groupId>/<artifactId>/<artifactId>-<fixedver>.jar overlaid onto /opt/keycloak/lib, L-047 anchored match) for a vulnerable bundled jar, and (b) a freshest eclipse-temurin:21-jre digest + debvendor dist-upgrade for base/JRE/OS CVEs. Populate from the first Scout verdict.",
+    "install": {
+      "extract_to": "/opt/keycloak",
+      "output_glob": "quarkus/dist/target/keycloak-26.8.2.tar.gz"
+    },
+    "jdk_version": "21",
+    "maven_dependency_overrides": [
+      {
+        "artifacts": [
+          "guava"
+        ],
+        "exclusions": [
+          {
+            "artifact": "jsr305",
+            "group": "com.google.code.findbugs"
+          },
+          {
+            "artifact": "listenablefuture",
+            "group": "com.google.guava"
+          }
+        ],
+        "group": "com.google.guava",
+        "guard": "<quarkus.version>3.40.1.1</quarkus.version>",
+        "version": "33.7.2-jre",
+        "why": "CVE-2026-102554 / GHSA-xxph-c9ww-hj94 (high, published 2026-10-27; fixed in 33.7.2-jre). quarkus-bom 3.40.1 manages guava at 33.6.0-jre (with these two exclusions, restated here because an override replaces the BOM's entry whole); held chain 684's G8 refused the publish on it (fixable_crit_high=1). Was a perl source_prep command (04b20374), now this engine key. Re-decided 2026-11-06 for keycloak 26.8.2 (quarkus-bom 3.40.1.1, read from Maven Central): it still manages guava at 33.6.0-jre with the same two exclusions, so the override stays; guard moved to 3.40.1.1."
+      }
+    ],
+    "maven_version": "3.9.8",
+    "offline_augment": {
+      "cmd": "/opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true --metrics-enabled=true"
+    },
+    "offline_build_cmds": [
+      "cd /src && KC_BUILD_TIME=\"$(printf '%s\\n' $MAVEN_ARGS | sed -n 's/^-Dproject\\.build\\.outputTimestamp=\\([0-9]\\{4\\}-[0-9][0-9]-[0-9][0-9]\\)T\\([0-9][0-9]:[0-9][0-9]\\):[0-9][0-9]Z$/\\1 \\2/p')\" && test -n \"$KC_BUILD_TIME\" && echo \"keycloak-version.properties build-time=$KC_BUILD_TIME\" && npm_config_store_dir=/pnpm-store npm_config_cache=/pnpm-cache MAVEN_OPTS=-Xmx3g mvn \"-Dtimestamp=$KC_BUILD_TIME\" -o -B -pl quarkus/deployment,quarkus/dist -am -DskipTests -DskipProtoLock=true -Dmaven.build.cache.enabled=false -Dmaven.repo.local=/m2 clean install",
+      "tar -xzf quarkus/dist/target/keycloak-*.tar.gz -C /opt --strip-components=0 && mv /opt/keycloak-* /opt/keycloak && mkdir -p /opt/keycloak/data",
+      "mkdir -p /tmp/rs-canon && printf '%s\\n' 'import java.io.*;' 'import java.nio.file.*;' '' '// Re-serializes the Quarkus lib/deployment/appmodel.dat with every String interned, so a value that occurs twice is' '// always written as one TC_STRING plus back-references. ObjectOutputStream otherwise shares a String only when the' '// in-memory model happened to hold the same instance, which varies from build to build.' 'public class AppModelCanon {' '    public static void main(String[] args) throws Exception {' '        Path in = Path.of(args[0]), out = Path.of(args.length > 1 ? args[1] : args[0]);' '        byte[] original = Files.readAllBytes(in);' '        Object model;' '        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(original))) {' '            model = ois.readObject();' '            if (ois.read() != -1) throw new IllegalStateException(\"trailing data after the model in \" + in);' '        }' '        ByteArrayOutputStream bytes = new ByteArrayOutputStream();' '        try (ObjectOutputStream oos = new ObjectOutputStream(bytes) {' '            { enableReplaceObject(true); }' '            @Override protected Object replaceObject(Object o) { return o instanceof String s ? s.intern() : o; }' '        }) {' '            oos.writeObject(model);' '        }' '        Files.write(out, bytes.toByteArray());' '        System.out.println(\"canonicalized \" + in + \" -> \" + out + \" (\" + original.length + \" -> \" + bytes.size() + \" bytes)\");' '    }' '}' > /tmp/rs-canon/AppModelCanon.java && java -cp '/opt/keycloak/lib/lib/deployment/*:/opt/keycloak/lib/lib/boot/*:/opt/keycloak/lib/lib/main/*' /tmp/rs-canon/AppModelCanon.java /opt/keycloak/lib/lib/deployment/appmodel.dat && rm -rf /tmp/rs-canon"
+    ],
+    "offline_env": {
+      "MAVEN_OPTS": "-Xmx3g",
+      "npm_config_cache": "/pnpm-cache",
+      "npm_config_store_dir": "/pnpm-store"
+    },
+    "online_vendor_cmds": [
+      "cd /src && KC_BUILD_TIME=\"$(printf '%s\\n' $MAVEN_ARGS | sed -n 's/^-Dproject\\.build\\.outputTimestamp=\\([0-9]\\{4\\}-[0-9][0-9]-[0-9][0-9]\\)T\\([0-9][0-9]:[0-9][0-9]\\):[0-9][0-9]Z$/\\1 \\2/p')\" && test -n \"$KC_BUILD_TIME\" && echo \"keycloak-version.properties build-time=$KC_BUILD_TIME\" && npm_config_store_dir=/pnpm-store npm_config_cache=/pnpm-cache MAVEN_OPTS=-Xmx3g mvn \"-Dtimestamp=$KC_BUILD_TIME\" -B -pl quarkus/deployment,quarkus/dist -am -DskipTests -DskipProtoLock=true -Dmaven.build.cache.enabled=false -Dmaven.repo.local=/m2 clean install"
+    ],
+    "ref": "26.8.2",
+    "repo": "https://github.com/keycloak/keycloak",
+    "source_date_epoch": 1795333788,
+    "source_date_epoch_basis": "release-cut",
+    "source_date_epoch_provenance": "the time release 26.8.2-CE-ubuntu24.04-r5 was cut (2026-11-22T07:49:48Z), by scripts/retarget.py --rev-bump: ReadyStack dates an image by when its release was packaged (owner 2026-11-10), recorded here once and used by every rebuild of the release; it builds upstream commit e514445f9dcd, dated 2026-11-05T15:27:24Z (source.commit_epoch).",
+    "source_prep": [
+      "mkdir -p /pnpm-store /pnpm-cache && printf 'store-dir=/pnpm-store\\ncache-dir=/pnpm-cache\\n' > /root/.npmrc && cat /root/.npmrc",
+      "printf '%s\\n' '--- a/quarkus/deployment/src/main/java/org/keycloak/quarkus/deployment/KeycloakProcessor.java' '+++ b/quarkus/deployment/src/main/java/org/keycloak/quarkus/deployment/KeycloakProcessor.java' '@@ -25,9 +25,11 @@' ' import java.nio.charset.StandardCharsets;' ' import java.util.ArrayList;' ' import java.util.Collections;' '+import java.util.Comparator;' ' import java.util.Enumeration;' ' import java.util.HashMap;' ' import java.util.HashSet;' '+import java.util.LinkedHashMap;' ' import java.util.LinkedHashSet;' ' import java.util.List;' ' import java.util.Map;' '@@ -41,6 +43,7 @@' ' import java.util.jar.JarEntry;' ' import java.util.jar.JarFile;' ' import java.util.logging.Handler;' '+import java.util.stream.Collectors;' ' ' ' import jakarta.inject.Singleton;' ' import jakarta.persistence.PersistenceUnitTransactionType;' '@@ -708,7 +711,9 @@' '     @Record(ExecutionTime.STATIC_INIT)' '     @BuildStep' '     void prepareKeycloakLogFilter(KeycloakRecorder recorder) {' '-        recorder.setHibernateUnsupportedProperties(collectAllDefaultUnsupportedHibernateProperties());' '+        // Sorted: the source set is Collectors.toUnmodifiableSet(), whose iteration order is salted per JVM run.' '+        recorder.setHibernateUnsupportedProperties(collectAllDefaultUnsupportedHibernateProperties().stream().sorted()' '+                .collect(Collectors.toCollection(LinkedHashSet::new)));' '     }' ' ' '     @BuildStep' '@@ -833,10 +838,31 @@' ' ' '         return SyntheticBeanBuildItem.configure(QuarkusKeycloakSessionFactory.class).scope(Singleton.class)' '                 .unremovable()' '-                .runtimeValue(recorder.createSessionFactory(factories, defaultProviders, preConfiguredProviders,' '+                .runtimeValue(recorder.createSessionFactory(stableFactories(factories),' '+                        stableOrder(defaultProviders, Class::getName), stableOrder(preConfiguredProviders, id -> id),' '                         loadThemesFromClassPath())).done();' '     }' ' ' '+    // The recorder replays each map in iteration order. These maps are HashMaps keyed by Spi instances and Class' '+    // objects, which hash by identity, so their order (and the generated bytecode) changed from one JVM run to the next.' '+    private static Map<Spi, Map<Class<? extends Provider>, Map<String, Class<? extends ProviderFactory>>>> stableFactories(' '+            Map<Spi, Map<Class<? extends Provider>, Map<String, Class<? extends ProviderFactory>>>> factories) {' '+        Map<Spi, Map<Class<? extends Provider>, Map<String, Class<? extends ProviderFactory>>>> result = new LinkedHashMap<>();' '+        stableOrder(factories, spi -> spi.getName() + \"/\" + spi.getClass().getName()).forEach((spi, byProvider) -> {' '+            Map<Class<? extends Provider>, Map<String, Class<? extends ProviderFactory>>> providers = new LinkedHashMap<>();' '+            stableOrder(byProvider, Class::getName).forEach((provider, byId) -> providers.put(provider, stableOrder(byId, id -> id)));' '+            result.put(spi, providers);' '+        });' '+        return result;' '+    }' '+' '+    private static <K, V> Map<K, V> stableOrder(Map<K, V> map, Function<K, String> sortKey) {' '+        Map<K, V> result = new LinkedHashMap<>();' '+        map.entrySet().stream().sorted(Comparator.comparing(e -> sortKey.apply(e.getKey())))' '+                .forEachOrdered(e -> result.put(e.getKey(), e.getValue()));' '+        return result;' '+    }' '+' '     private List<ClasspathThemeProviderFactory.ThemesRepresentation> loadThemesFromClassPath() {' '         try {' '             List<ClasspathThemeProviderFactory.ThemesRepresentation> themes = new ArrayList<>();' > /tmp/rs-kc-determinism.patch && git apply --verbose /tmp/rs-kc-determinism.patch && rm -f /tmp/rs-kc-determinism.patch && grep -qF 'recorder.createSessionFactory(stableFactories(factories),' quarkus/deployment/src/main/java/org/keycloak/quarkus/deployment/KeycloakProcessor.java && grep -qF 'collectAllDefaultUnsupportedHibernateProperties().stream().sorted()' quarkus/deployment/src/main/java/org/keycloak/quarkus/deployment/KeycloakProcessor.java && echo 'KeycloakProcessor: recorder inputs in a stable order'"
+    ],
+    "vendor_dirs": [
+      "/m2",
+      "/pnpm-store",
+      "/pnpm-cache"
+    ],
+    "vendored_export_note": "Renderer exports vendored/keycloak-dist (the from-source-built, unpacked /opt/keycloak) + vendored/debs (the eclipse-temurin:21-jre-noble dist-upgrade deb closure incl. curl/tzdata/ca-certificates). The offline Dockerfile: FROM <jre base pin>; dpkg-install debs; COPY vendored/keycloak-dist /opt/keycloak; RUN kc.sh build ...; useradd keycloak; chown -R keycloak /opt/keycloak; USER keycloak; ENTRYPOINT. STRICTER ALTERNATIVE (Go-analogous, higher-risk, only if a true offline RECOMPILE is required): vendor stage also exports a populated -Dmaven.repo.local=.m2 and the offline stage re-runs `./mvnw -o ... install`; Maven -o plugin resolution is fragile, so Design A (compile-online/assemble-offline, the Node model) is the primary path."
+  },
+  "version": "26.8.2"
+}

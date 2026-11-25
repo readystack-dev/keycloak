@@ -1,0 +1,46 @@
+{
+  "bases": [
+    {
+      "digest": "sha256:63826d91ac2cba21f66b41f24b53198eeb5e2a79e305ea2752de39f80da4c0e8",
+      "layout": "bases/eclipse-temurin_21-jre-noble_ac595159aa22.oci",
+      "ref": "eclipse-temurin:21-jre-noble@sha256:ac595159aa2209f07a2331efa8a8ce4278b77a7b76a9365a0f173786d5067a9e"
+    },
+    {
+      "digest": "sha256:fea12ba16096adec0f699ce1c4da2154d320450e56c1f63671f95d2a3551c77b",
+      "layout": "bases/golang_1.27.3-bookworm_972b4110ba0f.oci",
+      "ref": "golang:1.27.3-bookworm@sha256:972b4110ba0f47539a975c31e52c64765e1ff19f2d74469ae4a595c6676e80a5"
+    },
+    {
+      "digest": "sha256:6847cbbf21e159f97819f18336cf6bbc24a89f9eb6439317520d93f904e9a916",
+      "layout": "bases/maven_3.9.8-eclipse-temurin-21_de18e4e51396.oci",
+      "ref": "maven:3.9.8-eclipse-temurin-21@sha256:de18e4e51396ad9266f76669779ed6d6b49fbb0f45ed6f39169d87378d548d7d"
+    },
+    {
+      "digest": "sha256:9a04f13b3f80ef056361e30868593b1cfd2279fe19e4081cb93a90bf56819d6a",
+      "layout": "bases/ubuntu_24.04_9c7f200c07e3.oci",
+      "ref": "ubuntu:24.04@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289"
+    }
+  ],
+  "engine": {
+    "archive": "toolchain/buildkit.tar",
+    "image_digest": "sha256:e0e67ea9c4bb07bdef683e29f70f3b623d1eb9c82274a9ec04e6bb0511449fb0",
+    "kind": "buildkit",
+    "tag": "moby/buildkit:v0.31.2"
+  },
+  "inputs": {
+    "context": ".",
+    "dockerfile": "Dockerfile.offline.pinned",
+    "mtime_policy": "clamp",
+    "source_date_epoch": 1795333788,
+    "tree_hash": "sha256:2729cbc6c14735a3dadf026291cea2dfce670ef8eca9ef4dd387347f248f3d91"
+  },
+  "probe": {
+    "skip": "this image needs pg (not part of this archive); boot it with your own services as the admin handbook describes"
+  },
+  "schema": "readystack-rebuild-bundle/v0.1",
+  "subject": {
+    "config_digest": "sha256:64220669c2f942dbe13c299d9a10ead626d05a70a3b9289689faaf0c9e14df8b",
+    "image_manifest_digest": "sha256:d26a943af80397d2aa6986f505cef74c2a5475a3d01511ac2219ff0be9719190",
+    "name": "docker.io/readystack/keycloak:26.8.2-CE-ubuntu24.04-r5"
+  }
+}
